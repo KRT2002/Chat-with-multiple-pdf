@@ -1,0 +1,9 @@
+streamlit
+langchain
+PyPDF2
+langchain-chroma
+scikit-learn
+langchain-community
+pacmap
+plotly
+python-dotenv
