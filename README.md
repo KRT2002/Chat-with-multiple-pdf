@@ -48,9 +48,10 @@ To utilize the Chat with Multiple PDF App, please proceed with the following ste
 1. Ensure that you have installed the required dependencies and added the Hugging Face API key to the .env file.
 
 2. Run the app.py file using the Streamlit CLI. Execute the subsequent command:
-'''
+
+ ```
 streamlit run app.py
-'''
+ ```
 This command initiates the application, and it will open in your default web browser, showcasing the user interface.
 
 3. Load multiple PDF documents into the app by following the provided instructions.
