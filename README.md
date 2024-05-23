@@ -31,13 +31,14 @@ To install the Chat with Multiple PDF App, please adhere to the following instru
  ```
  pip install -r requirements.txt
  ```
-This ensures that all required packages are correctly installed.
+   This ensures that all required packages are correctly installed.
 
 3. Obtain an API key from the Hugging Face model hub and incorporate it into the .env file located in the project directory.
+
 ```commandline
 HUGGINGFACE_API_KEY=your_secret_api_key
 ```
-This step is crucial for accessing the language model from the Hugging Face model hub.
+   This step is crucial for accessing the language model from the Hugging Face model hub.
 
 ## Usage
 -----
