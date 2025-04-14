@@ -7,3 +7,7 @@ langchain-community
 pacmap
 plotly
 python-dotenv
+python-docx
+langchain-google-genai
+langchain-groq
+tqdm

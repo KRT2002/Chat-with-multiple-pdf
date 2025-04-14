@@ -5,6 +5,8 @@ import pacmap
 import plotly.express as px
 import numpy as np
 import pandas as pd
+import os
+import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceInferenceAPIEmbeddings
 from langchain_chroma import Chroma
@@ -19,42 +21,119 @@ from sklearn.metrics.pairwise import cosine_similarity
 from itertools import chain
 import random
 import string
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
+from docx import Document
+from tqdm import tqdm
 
 
-# Function to process a chunk of pages
+# # Function to process a chunk of pages
+# def process_chunk(chunk_start, chunk_end, pdf_file):
+#     chunk_text = ""
+#     for page_num in range(chunk_start, chunk_end):
+#         page = pdf_file.pages[page_num]
+#         page_text = page.extract_text()
+#         chunk_text += page_text
+#     return chunk_text
+
+# def get_texts_from_pdf(uploaded_files):
+
+#     text = ""
+
+#     for uploaded_file in uploaded_files:
+
+#         # Open the uploaded PDF file
+#         pdf_file = PdfReader(uploaded_file)
+
+#         # Process each page of the PDF file in chunks
+#         total_pages = len(pdf_file.pages)
+#         chunk_size = 10  # Number of pages to process in each chunk
+
+#         # Determine the number of CPU cores
+#         num_cores = multiprocessing.cpu_count()
+
+#         # Divide the pages into chunks for parallel processing
+#         chunks = [(start, min(start + chunk_size, total_pages)) for start in range(0, total_pages, chunk_size)]
+#         # Create a multiprocessing Pool
+#         with multiprocessing.Pool(processes=num_cores) as pool:
+#             # Process the PDF file in parallel using multiprocessing Pool
+#             chunk_texts = pool.starmap(process_chunk, [(start, end, pdf_file) for start, end in chunks])
+        
+#         # Concatenate the text from all chunks
+#         text += ''.join(chunk_texts)
+
+#     return text
+
 def process_chunk(chunk_start, chunk_end, pdf_file):
+    """
+    Extract text from a chunk of PDF pages.
+
+    Args:
+        chunk_start (int): Starting page number.
+        chunk_end (int): Ending page number.
+        pdf_file (PdfReader): PdfReader object.
+
+    Returns:
+        str: Extracted text from the chunk.
+    """
     chunk_text = ""
     for page_num in range(chunk_start, chunk_end):
         page = pdf_file.pages[page_num]
         page_text = page.extract_text()
-        chunk_text += page_text
+        if page_text:
+            chunk_text += page_text
     return chunk_text
 
-def get_texts_from_pdf(uploaded_files):
 
+def extract_text_from_pdf(pdf_path):
+    """
+    Extract text from a PDF file using multiprocessing.
+
+    Args:
+        pdf_path (str): Path to the PDF file.
+
+    Returns:
+        str: Complete text extracted from the PDF.
+    """
+    pdf_file = PdfReader(pdf_path)
+    total_pages = len(pdf_file.pages)
+    chunk_size = 10
+    # num_cores = multiprocessing.cpu_count()
+    num_cores = 4
+
+    chunks = [(start, min(start + chunk_size, total_pages)) 
+              for start in range(0, total_pages, chunk_size)]
+
+    with multiprocessing.Pool(processes=num_cores) as pool:
+        chunk_texts = pool.starmap(process_chunk, [(start, end, pdf_file) for start, end in tqdm(chunks, total=len(chunks))])
+
+    return ''.join(chunk_texts)
+
+
+def get_texts_from_files(uploaded_files):
+    """
+    Extract text from a list of files (.pdf, .docx, .txt).
+
+    Args:
+        uploaded_files (list): List of file paths.
+
+    Returns:
+        str: Combined extracted text from all files.
+    """
     text = ""
 
-    for uploaded_file in uploaded_files:
-
-        # Open the uploaded PDF file
-        pdf_file = PdfReader(uploaded_file)
-
-        # Process each page of the PDF file in chunks
-        total_pages = len(pdf_file.pages)
-        chunk_size = 10  # Number of pages to process in each chunk
-
-        # Determine the number of CPU cores
-        num_cores = multiprocessing.cpu_count()
-
-        # Divide the pages into chunks for parallel processing
-        chunks = [(start, min(start + chunk_size, total_pages)) for start in range(0, total_pages, chunk_size)]
-        # Create a multiprocessing Pool
-        with multiprocessing.Pool(processes=num_cores) as pool:
-            # Process the PDF file in parallel using multiprocessing Pool
-            chunk_texts = pool.starmap(process_chunk, [(start, end, pdf_file) for start, end in chunks])
-        
-        # Concatenate the text from all chunks
-        text += ''.join(chunk_texts)
+    for file_path in uploaded_files:
+        if file_path.name.endswith(".txt"):
+            text += "\n\n" + file_path.read().decode("utf-8")
+        elif file_path.name.endswith(".pdf"):
+            text += "\n\n" + extract_text_from_pdf(file_path)
+        elif file_path.name.endswith(".docx"):
+            # print(f"Note: DOCX to PDF conversion only creates a PDF object in memory, not for text extraction.")
+            # Optionally, extract text directly instead of converting
+            doc = Document(file_path)
+            text += "\n\n" + "\n".join(para.text for para in doc.paragraphs)
+        else:
+            print(f"Unsupported file format: {file_path}")
 
     return text
 
@@ -69,7 +148,7 @@ def get_all_docs_embedding(embeddings, all_splits):
     total_docs = len(all_splits)
     chunk_size = 10  # Number of docs to process in each chunk
     # Determine the number of CPU cores
-    num_cores = multiprocessing.cpu_count()
+    num_cores = 4
 
     # Divide the pages into chunks for parallel processing
     chunks = [(start, min(start + chunk_size, total_docs)) for start in range(0, total_docs, chunk_size)]
@@ -77,10 +156,11 @@ def get_all_docs_embedding(embeddings, all_splits):
     with multiprocessing.Pool(processes=num_cores) as pool:
         # Process the PDF file in parallel using multiprocessing Pool
         chunk_docs_embeddings = pool.starmap(get_chunk_docs_embedding, 
-                                             [(embeddings, start, end, all_splits) for start, end in chunks])
+                                             [(embeddings, start, end, all_splits) for start, end in tqdm(chunks, total=len(chunks))])
     # merge list of chunks into single list
     docs_embeddings = list(chain.from_iterable(chunk_docs_embeddings))
     return docs_embeddings
+
 
 def split_text_into_chunks(text):
     text_splitter = RecursiveCharacterTextSplitter(
@@ -98,10 +178,18 @@ def pretty_print_docs(docs):
         )
     )
 
-def get_embeddings(HUGGINGFACEHUB_API_TOKEN):
+# def get_embeddings(HUGGINGFACEHUB_API_TOKEN):
+#     embeddings = HuggingFaceInferenceAPIEmbeddings(
+#         api_key = HUGGINGFACEHUB_API_TOKEN,
+#         model_name="sentence-transformers/all-MiniLM-l6-v2"
+#     )
+#     return embeddings
+
+def get_embeddings():
+    HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
     embeddings = HuggingFaceInferenceAPIEmbeddings(
-        api_key = HUGGINGFACEHUB_API_TOKEN,
-        model_name="sentence-transformers/all-MiniLM-l6-v2"
+        api_key = HUGGINGFACE_API_TOKEN,
+        model_name="mixedbread-ai/mxbai-embed-large-v1"
     )
     return embeddings
 
@@ -111,7 +199,8 @@ def get_vectorstore(all_splits, embeddings):
     name = ''.join(random.choices(string.ascii_letters, k=length))
     vectorstore = Chroma.from_texts(texts=all_splits,
                                     embedding=embeddings,
-                                    collection_name = name)
+                                    collection_name = name,
+                                    persist_directory='db')
     return vectorstore
     
 def get_contexual_retriever(vectorstore, embeddings):
@@ -128,17 +217,39 @@ def get_contexual_retriever(vectorstore, embeddings):
 
     return compression_retriever
 
-def get_llm(HUGGINGFACEHUB_API_TOKEN):
-    llm = HuggingFaceEndpoint(
-        repo_id="HuggingFaceH4/zephyr-7b-beta",
-        task="text-generation",
-        max_new_tokens = 512,
-        top_k = 50,
-        temperature = 0.1,
-        repetition_penalty = 1.03,
-        huggingfacehub_api_token = HUGGINGFACEHUB_API_TOKEN
-    )
+# def get_llm(HUGGINGFACEHUB_API_TOKEN):
+#     llm = HuggingFaceEndpoint(
+#         repo_id="HuggingFaceH4/zephyr-7b-beta",
+#         task="text-generation",
+#         max_new_tokens = 512,
+#         top_k = 50,
+#         temperature = 0.1,
+#         repetition_penalty = 1.03,
+#         huggingfacehub_api_token = HUGGINGFACEHUB_API_TOKEN
+#     )
+#     return llm
+
+def get_llm(model_id: str):
+    if 'gemini' in model_id:
+        GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+        llm = ChatGoogleGenerativeAI(
+            model=model_id,
+            temperature=0.1,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+            api_key=GOOGLE_API_KEY
+        )
+    else:
+        GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+        # Initialize Groq LLM
+        llm = ChatGroq(
+            model_name=model_id,
+            temperature=0.1,
+            api_key=GROQ_API_KEY
+        )
     return llm
+
 
 def history_aware_retriever_chain(llm, compression_retriever):
 
@@ -166,7 +277,7 @@ def qa_chain(llm):
     qa_system_prompt = """
     Please provide concise assistance for the user's query. \
     If context is not provided, explicitly state 'I don't know' instead of attempting to answer the question. \
-    Limit your response to three sentences at most for brevity.
+    You must not add uncessary information. 
 
     <context>
     {context}
@@ -200,6 +311,9 @@ def question_answering_function(user_query, chat_history, history_aware_retrieve
         "input": user_query,
         "context": context_
     }))
+    if "deepseek" in st.session_state.selected_model:
+        result = re.sub(r'<think>.*?</think>','', result, flags=re.DOTALL).strip()
+    st.write(f"{result}")
     if "Assistant:" in result:
        result = result.split("Assistant:")[1].strip()
     chat_history.insert(AIMessage(content = result))
@@ -216,9 +330,9 @@ def question_answering_function(user_query, chat_history, history_aware_retrieve
 def previous_question(user_query, chat_history, context_list, embeddings, history_aware_retriever, question_answer_chain):
 
   if len(chat_history)!=0:
-    embeddings_1 = np.array(embeddings.embed_query(user_query)).reshape(1,384)
+    embeddings_1 = np.array(embeddings.embed_query(user_query)).reshape(1,1024)
     for i in range(0, len(chat_history), 2):
-      embeddings_2 = np.array(embeddings.embed_query(chat_history[i].content)).reshape(1,384)
+      embeddings_2 = np.array(embeddings.embed_query(chat_history[i].content)).reshape(1,1024)
       similarity_matrix = cosine_similarity(embeddings_1, embeddings_2)
       if similarity_matrix[0][0] > 0.9:
         return (chat_history[i+1].content, context_list[int(i/2)], chat_history, context_list)
