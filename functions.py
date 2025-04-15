@@ -27,43 +27,6 @@ from docx import Document
 from tqdm import tqdm
 
 
-# # Function to process a chunk of pages
-# def process_chunk(chunk_start, chunk_end, pdf_file):
-#     chunk_text = ""
-#     for page_num in range(chunk_start, chunk_end):
-#         page = pdf_file.pages[page_num]
-#         page_text = page.extract_text()
-#         chunk_text += page_text
-#     return chunk_text
-
-# def get_texts_from_pdf(uploaded_files):
-
-#     text = ""
-
-#     for uploaded_file in uploaded_files:
-
-#         # Open the uploaded PDF file
-#         pdf_file = PdfReader(uploaded_file)
-
-#         # Process each page of the PDF file in chunks
-#         total_pages = len(pdf_file.pages)
-#         chunk_size = 10  # Number of pages to process in each chunk
-
-#         # Determine the number of CPU cores
-#         num_cores = multiprocessing.cpu_count()
-
-#         # Divide the pages into chunks for parallel processing
-#         chunks = [(start, min(start + chunk_size, total_pages)) for start in range(0, total_pages, chunk_size)]
-#         # Create a multiprocessing Pool
-#         with multiprocessing.Pool(processes=num_cores) as pool:
-#             # Process the PDF file in parallel using multiprocessing Pool
-#             chunk_texts = pool.starmap(process_chunk, [(start, end, pdf_file) for start, end in chunks])
-        
-#         # Concatenate the text from all chunks
-#         text += ''.join(chunk_texts)
-
-#     return text
-
 def process_chunk(chunk_start, chunk_end, pdf_file):
     """
     Extract text from a chunk of PDF pages.
@@ -103,6 +66,8 @@ def extract_text_from_pdf(pdf_path):
 
     chunks = [(start, min(start + chunk_size, total_pages)) 
               for start in range(0, total_pages, chunk_size)]
+    
+    st.info(f"Split into {len(chunks)} chunks for text extraction")
 
     with multiprocessing.Pool(processes=num_cores) as pool:
         chunk_texts = pool.starmap(process_chunk, [(start, end, pdf_file) for start, end in tqdm(chunks, total=len(chunks))])
@@ -133,7 +98,7 @@ def get_texts_from_files(uploaded_files):
             doc = Document(file_path)
             text += "\n\n" + "\n".join(para.text for para in doc.paragraphs)
         else:
-            print(f"Unsupported file format: {file_path}")
+            st.write(f"Unsupported file format: {file_path}")
 
     return text
 
@@ -152,6 +117,9 @@ def get_all_docs_embedding(embeddings, all_splits):
 
     # Divide the pages into chunks for parallel processing
     chunks = [(start, min(start + chunk_size, total_docs)) for start in range(0, total_docs, chunk_size)]
+    
+    st.info(f"Split into {len(chunks)} chunks for embedding generation")
+
     # Create a multiprocessing Pool
     with multiprocessing.Pool(processes=num_cores) as pool:
         # Process the PDF file in parallel using multiprocessing Pool
