@@ -22,10 +22,8 @@ model_id = st.selectbox(
     options=[
         "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-8b", 
         "gemini-1.5-pro", "llama-3.3-70b-versatile", "meta-llama/llama-4-scout-17b-16e-instruct", 
-        "mistral-saba-24b", "qwen-2.5-coder-32b", "qwen-2.5-32b", "llama-3.3-70b-specdec", 
-        "llama-3.2-1b-preview", "llama-3.2-3b-preview", "llama-3.2-11b-vision-preview", 
-        "llama-3.2-90b-vision-preview", "gemma2-9b-it", "llama-3.1-8b-instant", "llama3-70b-8192", 
-        "llama3-8b-8192", "deepseek-r1-distill-qwen-32b", "deepseek-r1-distill-llama-70b"
+        "mistral-saba-24b", "gemma2-9b-it", "llama-3.1-8b-instant", "llama3-70b-8192", 
+        "llama3-8b-8192", "deepseek-r1-distill-llama-70b"
     ], 
     index=0
 )
